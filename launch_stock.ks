@@ -18,6 +18,8 @@ set peg_targettype to 2.
 peg_set_peA_apA_attA(tgt_per, 200000, 0).
 peg_set_inc_lan_at_r(30).
 
+// This is the kOS MyFirstRocket craft with an additional Adv Inline Stabilizer on the upper stage for more RW control.
+//
 // mass is t, thrust is kN, isp is sec, stages are reverse order from ksp (bottom up if you're looking at MJ)
 // ISP numbers for RO engines should come from only MJ's deltaV analyzer and not the PAW or KER
 // (MJ gets nonISP fuel correct).
