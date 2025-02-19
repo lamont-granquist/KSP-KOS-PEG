@@ -23,6 +23,7 @@
 // - Kim2012: https://www.icas.org/icas_archive/ICAS2012/PAPERS/611.PDF (PEG for ramjet missiles)
 // - Scarritt2015: https://core.ac.uk/download/pdf/42719321.pdf (NASA Orion on-orbit PEG modifications)
 // - Fill2018: https://ntrs.nasa.gov/api/citations/20180001863/downloads/20180001863.pdf (NASA Orion on-orbit PEG w/good LTVC info)
+// - Fill2018-2: https://ntrs.nasa.gov/api/citations/20180001864/downloads/20180001864.pdf (NASA Orion PEG presentation)
 // - Ito2021: https://arc.aiaa.org/doi/10.2514/1.G005577 (PEG modifications for Lunar Descent w/switching function)
 // - Wang2022: https://ascelibrary.org/doi/10.1061/%28ASCE%29AS.1943-5525.0001383 (RK4 integrator for PEG descent)
 // - Zhang2022: https://doi.org/10.1088/1742-6596/2235/1/012017 (another PEG-ish landing algorithm)
@@ -36,15 +37,31 @@
 //             Shuttle Memo No. SHUTTLE-89-022, C.S. Draper Laboratory
 //
 
+//
+// peg_targettype options:
+//
+//   1: standard PEG ascent 5-orbital conditions with rdval, vdval, gamma, iy.
+//   2. PEG ascent 4-orbital conditions with rdval, vdval, gamma, inc.  However, iy must be initialized to a decent guess with the correct inc.
+//
+// peg_thrustcalc options:
+//
+//   1. PEG with higher order terms (e.g. Langston1975/McHenry1979).
+//   2. PEG without higher order terms. [ simpler, less accurate, eliminates biasing ]
+//   3. UPFG style integrals (Brand1973 or kOS PEGAS2). [ more nonlinear, possibly more accurate, seems less stable ]
+//
+
 run once lib_util.
 
 // PEG Ascent target conditions
 global peg_rdval is 0.     // mode 1,2
 global peg_vdval is 0.     // mode 1,2
 global peg_gamma is 0.     // mode 1,2
-global peg_iy is V(0,0,0). // mode 1
+global peg_iy is V(0,0,0). // mode 1,2
 global peg_inc is 0.       // mode 2
+
+// Global Options
 global peg_targettype is 2.
+global peg_thrustcalc is 1.
 
 // Public helpers for alternative PEG target conditions
 function peg_set_inc_lan {
@@ -129,6 +146,8 @@ local i_F is V(0,0,0).
 local tguid is 0.
 local tgo is 0.
 local vgo is 0.
+local converged is false.
+local failed is false.
 
 // private trigger variables to ensure we're reading off guidance only while peg isn't running.
 local pegresults is false.
@@ -151,13 +170,25 @@ when pegresults then {
     lock peg_tgo to peg_tguid + peg_tgo_at_tguid - missiontime.
     lock peg_heading to mod360(arctan2(vdot(peg_uf(), -vcrs(ship:north:vector, ship:up:vector)), vdot(peg_uf(), ship:north:vector))).
 
+    set peg_converged to converged.
     set runpeg to true.
 
     return true.
 }
 
+function peg_checkargs {
+    if peg_targettype < 1 or peg_targettype > 2 {
+        this_is_an_error().
+    }
+    if peg_thrustcalc < 1 or peg_thrustcalc > 3 {
+        this_is_an_error().
+    }
+}
+
 // FIXME: break up this function so people can write their own peg loop.
 function peg {
+    peg_checkargs().
+
     // these variables are necessary for sensed velocity calcs
     local vprev is V(0,0,0).
     local vgrav is V(0,0,0).
@@ -193,6 +224,8 @@ function peg {
     until false {
         wait until runpeg.
         set runpeg to false.
+
+        if failed { peg_init(). }
 
         // update guidance input variables from "sensors".
         local o is ship:orbit.
@@ -231,12 +264,12 @@ function peg {
             set vgo to vv:normalized.
         }
 
-        // FIXME: needs to bail if too many iterations
-        // FIXME: needs to reinitialize after it bails
         // FIXME: needs better initialization
         // FIXME: do something about clipping lambdadot for short burns
         // FIXME: support coast-to-burn at fixed burn centroid?
         // FIXME: use kepler propagator for coasts?
+
+        local iter is 0.
 
         until false {
             /////////////////////////////////////
@@ -252,18 +285,18 @@ function peg {
                         set tgo to tgo + stage:bt.
                         set vgo1 to vgo1 + stage:vgo.
                     } else {
-                    local bt is stage:tau*(1.0-constant:e^(-vgoleft/stage:vex)).
-                    set tgo to tgo + bt.
-                    set vgo1 to vgo:mag.
+                        local bt is stage:tau*(1.0-constant:e^(-vgoleft/stage:vex)).
+                        set tgo to tgo + bt.
+                        set vgo1 to vgo:mag.
                     }
                 }
             }
 
-            if peg_converged and tgo < 5 {
+            if converged and tgo < 5 {
                 return.
             }
 
-            if peg_converged and tgo < 40 { set peg_terminalGuidance to true. }
+            if converged and tgo < 40 { set peg_terminalGuidance to true. }
             if throttle = 0 { set peg_terminalGuidance to false. }
 
             //////////////////////////////////////////////////
@@ -349,8 +382,10 @@ function peg {
 
             local ldm is lambdaDot:mag.
 
-            // clamp phi to 45 degrees
+            // large angle clamp for the thrust calculation in the predictor
+
             local phiMax is 45.0 * constant:degtorad.
+            if peg_thrustcalc = 3 { set phiMax to 90.0 * constant:degtorad. }
 
             if ldm > phiMax / K {
                 set ldm to phiMax / K.
@@ -366,16 +401,27 @@ function peg {
             // calculate rthrust/vthrust and rbias [PREDICTOR] //
             /////////////////////////////////////////////////////
 
-            local vthrust is lambda * ( Lt - ldm * ldm * ( Ht - Jt * K ) / 2.0 ).
-            local rthrust is lambda * ( St - ldm * ldm * ( Pt - 2.0 * Qt * K + St * K * K ) / 2.0 ) + Qp * lambdaDot.
+            local vthrust is 0.
+            local rthrust is 0.
 
-            //global vthrust is Lt * lambda.
-            //global rthrust is St * lambda + Qp * lambdaDot.
+            if peg_thrustcalc = 1 {
+                set vthrust to lambda * ( Lt - ldm * ldm * ( Ht - Jt * K ) / 2.0 ).
+                set rthrust to lambda * ( St - ldm * ldm * ( Pt - 2.0 * Qt * K + St * K * K ) / 2.0 ) + Qp * lambdaDot.
+            } else if peg_thrustcalc = 2 {
+                set vthrust to Lt * lambda.
+                set rthrust to St * lambda + Qp * lambdaDot.
+            } else if peg_thrustcalc = 3 {
+                local phi is K * ldm.
+                local phidot is - phi * Lt / Jt.
+                set vthrust to ( Lt - Lt * phi * phi / 2.0 - Jt * phi * phidot - Ht * phidot * phidot / 2.0 ) * lambda.
+                set rthrust to ( St - St * phi * phi / 2.0 - Qt * phi * phidot - Pt * phidot * phidot / 2.0 ) * lambda - ( St * phi + Qt * phidot ) * lambdaDot:normalized.
+            }
 
             set rbias to rgo - rthrust.
-            //set rbias to V(0,0,0).
 
             // rgrav/vgrav calculation from Delporte and Sauvient(1992) [NB: several typos].
+
+            local graviter = 0.
 
             set rp to rv + vv*tgo + rthrust + rgrav.
             set vp to vv + vthrust + vgrav.
@@ -400,7 +446,16 @@ function peg {
                 set rp to rv + vv*tgo + rthrust + rgrav.
                 set vp to vv + vthrust + vgrav.
 
-                if (rp - rp1):mag < 1 { break. }
+                print((rp - rp1):mag).
+
+                if (rp - rp1):mag < 0.001*rgo:mag { break. }
+
+                set graviter to graviter + 1.
+
+                if graviter > 20 {
+                    set failed to true.
+                    break.
+                }
             }
 
             //////////////////////////////////////////////////
@@ -422,21 +477,38 @@ function peg {
             if peg_targettype = 2 { // Jaggers1977
                 local n is V(0,0,1).
                 local SE to -0.5*(vdot(n,peg_iy) + cos(peg_inc))*vdot(n,iz)/(1-vdot(n,ix)^2). // converges to zero
-                set peg_iy to peg_iy*sqrt(1 - SE^2) + SE*iz.
+                set peg_iy to (peg_iy*sqrt(1 - SE^2) + SE*iz):normalized.
             }
 
             local vmiss is vd - vp.
 
             set vgo to vgo + 0.5 * vmiss. // 0.5 here stops chattering (NASA SLS fixes to PEG)
 
-            set peg_converged to vmiss:mag < 0.01 * vgo:mag.
+            set converged to vmiss:mag < 0.01 * vgo:mag.
 
             set tgoprev to tgo. // update rgrav for next loop
 
-            if peg_converged { break. }
+            if converged { break. }
+
+            set iter to iter + 1.
+
+            if iter > 20 {
+                set failed to true.
+                break.
+            }
+        }
+
+        if failed {
+            print("FAILED").
+        } else {
+            print("CONVERGED").
         }
         set vprev to vv. // update vgo guess for next guidance cycle
 
-        set pegresults to true.
+        if not failed {
+            set pegresults to true.
+        } else {
+            set runpeg to true.
+        }
     }
 }

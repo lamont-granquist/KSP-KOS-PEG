@@ -6,10 +6,10 @@ run once lib_rv2oe.
 run once lib_util.
 run once lib_peg.
 
-local tacc is 15.
-local tpo is tacc + 10.
-local tc is 3.
-local dtheta is 1.3.
+local tacc is 15.       // time of end of vertical rise, higher is less aggressive.
+local tpo is tacc + 10. // time to end of initiation.
+local tc is 3.          // time constant for decay from initiation to gravity turn.
+local dtheta is 2.0.    // angular deflection to initiate at tpo, higher is more aggressive.
 
 local tgt_per is 100000.
 
@@ -66,9 +66,6 @@ function set_switch_to_pitchover_trigger {
         lock pitch to fpa - (t - tacc) / (tpo - tacc) * dtheta.
         lock steering to heading(peg_heading(), pitch).
 
-        set kuniverse:timewarp:mode to "PHYSICS".
-        set kuniverse:timewarp:rate to 4.
-
         set_switch_to_gravity_turn_trigger().
     }
 }
@@ -79,6 +76,9 @@ function set_switch_to_gravity_turn_trigger {
         local t is missiontime.
 
         lock pitch to fpa - dtheta * constant:e^(-(t-tpo)/tc).
+
+        set kuniverse:timewarp:mode to "PHYSICS".
+        set kuniverse:timewarp:rate to 4.
 
         set_switch_to_coasting_trigger().
     }
@@ -129,11 +129,9 @@ function set_switch_to_insertion_trigger {
 set_start_launch_trigger().
 
 when peg_converged then {
-//    lock steering to peg_uf().
-//    print(ship:north:vector).
-//    print(ship:up:vector).
-//    print(peg_uf()).
-//    print(peg_heading()).
+    //print(peg_tgo()).
+    //print(peg_uf()).
+    //print(peg_heading()).
 
     return true.
 }
