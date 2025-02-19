@@ -226,7 +226,6 @@ function peg {
         // FIXME: needs to bail if too many iterations
         // FIXME: needs to reinitialize after it bails
         // FIXME: needs better initialization
-        // FIXME: cleanup all the global variables that don't need to be global
         // FIXME: do something about clipping lambdadot for short burns
         // FIXME: inclination and LAN control
         // FIXME: inclination and free LAN control
@@ -406,7 +405,7 @@ function peg {
 
             set vgo to vgo + 0.5 * vmiss. // 0.5 here stops chattering (NASA SLS fixes to PEG)
 
-            set peg_converged to vmiss:mag < 1.
+            set peg_converged to vmiss:mag < 0.01 * vgo:mag.
 
             set tgoprev to tgo. // update rgrav for next loop
 
