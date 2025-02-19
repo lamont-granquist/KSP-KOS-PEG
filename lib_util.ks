@@ -1,10 +1,10 @@
 @LAZYGLOBAL OFF.
 @CLOBBERBUILTINS OFF.
 
-function toinertial {
+function rotxy {
     parameter vec.
+    parameter ang.
 
-    local ang to vang(SOLARPRIMEVECTOR, V(1, 0, 0)).
     local sang to sin(ang).
     local cang to cos(ang).
 
@@ -15,18 +15,20 @@ function toinertial {
     ).
 }
 
+function toinertial {
+    parameter vec.
+
+    local ang to vang(SOLARPRIMEVECTOR, V(1, 0, 0)).
+
+    return rotxy(vec, ang).
+}
+
 function frominertial {
     parameter vec.
 
     local ang to vang(SOLARPRIMEVECTOR, V(1, 0, 0)).
-    local sang to sin(ang).
-    local cang to cos(ang).
 
-    return V(
-        vec:x * cang + vec:z * sang,
-        vec:y,
-        - vec:x * sang + vec:z * cang
-    ).
+    return rotxy(vec, -ang).
 }
 
 function swizzle {

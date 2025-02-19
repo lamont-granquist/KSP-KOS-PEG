@@ -14,6 +14,7 @@ local dtheta is 1.3.
 local tgt_per is 100000.
 
 // PEG target conditions
+set peg_targettype to 2.
 peg_set_peA_apA_attA(tgt_per, 200000, 0).
 peg_set_inc_lan_at_r(90).
 
@@ -37,8 +38,6 @@ function enable_autostaging {
 function set_start_launch_trigger {
     when peg_converged then {
         set_switch_to_vertical_rise_trigger().
-
-        return false.
     }
 }
 
@@ -53,7 +52,6 @@ function set_switch_to_vertical_rise_trigger {
 
     when ship:altitude > 120 then { // FIXME: altitude of launchpad fix
         lock steering to heading(90,90).
-        return false.
     }
 
     set_switch_to_pitchover_trigger().
@@ -68,9 +66,10 @@ function set_switch_to_pitchover_trigger {
         lock pitch to fpa - (t - tacc) / (tpo - tacc) * dtheta.
         lock steering to heading(peg_heading(), pitch).
 
-        set_switch_to_gravity_turn_trigger().
+        set kuniverse:timewarp:mode to "PHYSICS".
+        set kuniverse:timewarp:rate to 4.
 
-        return false.
+        set_switch_to_gravity_turn_trigger().
     }
 }
 
@@ -82,8 +81,6 @@ function set_switch_to_gravity_turn_trigger {
         lock pitch to fpa - dtheta * constant:e^(-(t-tpo)/tc).
 
         set_switch_to_coasting_trigger().
-
-        return false.
     }
 }
 
@@ -94,14 +91,24 @@ function set_switch_to_coasting_trigger {
         lock throttle to 0.
         lock steering to ship:velocity:surface.
 
+        // for some reason my vessel gets the wobblies at high physwarp on coast initiation.
+        set kuniverse:timewarp:rate to 0.
+
+        local resumewarp to missiontime + 3.
+
+        when missiontime > resumewarp then {
+            set kuniverse:timewarp:rate to 4.
+        }
+
         when ship:altitude > ship:obt:body:atm:height then {
             lock steering to frominertial(swizzle(peg_i_F)). // FIXME: peg_i_F should be in rotating alice-world
-            return false.
+        }
+
+        when ship:orbit:eta:apoapsis < 0.5*peg_tgo() + 10 then {
+            set kuniverse:timewarp:rate to 0.
         }
 
         set_switch_to_insertion_trigger().
-
-        return false.
     }
 }
 
@@ -115,8 +122,6 @@ function set_switch_to_insertion_trigger {
         // FIXME: need to have better cutoff based on reaching angular momentum target
         when peg_tgo() <= 0.02 then {
             lock throttle to 0.
-
-            return false.
         }
     }
 }

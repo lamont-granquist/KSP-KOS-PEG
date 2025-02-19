@@ -39,10 +39,12 @@
 run once lib_util.
 
 // PEG Ascent target conditions
-global peg_rdval is 0.
-global peg_vdval is 0.
-global peg_gamma is 0.
-global peg_iy is V(0,0,0).
+global peg_rdval is 0.     // mode 1,2
+global peg_vdval is 0.     // mode 1,2
+global peg_gamma is 0.     // mode 1,2
+global peg_iy is V(0,0,0). // mode 1
+global peg_inc is 0.       // mode 2
+global peg_targettype is 2.
 
 // Public helpers for alternative PEG target conditions
 function peg_set_inc_lan {
@@ -50,15 +52,21 @@ function peg_set_inc_lan {
     parameter lan.
 
     set peg_iy to V(-sin(lan)*sin(inc), cos(lan)*sin(inc), -cos(inc)).
+    set peg_inc to inc.
 }
 
 function peg_set_inc_lan_at_r {
     parameter inc.
+    parameter rot is 0.
 
     local rv is obt:position - obt:body:position.
     local vinc is horizontal_velocity_for_inclination(inc, rv, 1.0).
 
-    set peg_iy to toinertial(swizzle(vcrs(rv,vinc):normalized)).
+    local hhat is vcrs(rv, vinc):normalized.
+    set hhat to rotxy(hhat, rot).
+
+    set peg_iy to swizzle(toinertial(hhat)).
+    set peg_inc to inc.
 }
 
 function peg_set_sma_ecc_attR {
@@ -227,8 +235,6 @@ function peg {
         // FIXME: needs to reinitialize after it bails
         // FIXME: needs better initialization
         // FIXME: do something about clipping lambdadot for short burns
-        // FIXME: inclination and LAN control
-        // FIXME: inclination and free LAN control
         // FIXME: support coast-to-burn at fixed burn centroid?
         // FIXME: use kepler propagator for coasts?
 
@@ -331,7 +337,13 @@ function peg {
             local rgo is rd - ( rv + vv * tgo + rgrav ) + rbias.
 
             if not peg_terminalGuidance {
-                set rgo to rgo + ( St - vdot(lambda, rgo) ) * lambda.  // enforce orthogonality (converges to rgo = rgo)
+                if peg_targettype = 2 { // from Jaggers1977
+                    local ip is vcrs(lambda, peg_iy):normalized.
+                    local A1 is (rgo - vdot(lambda, rgo) * lambda) * ip.
+                    set rgo to St * lambda + A1 * ip.
+                } else {
+                    set rgo to rgo + ( St - vdot(lambda, rgo) ) * lambda.  // enforce orthogonality (converges to rgo = rgo)
+                }
                 set lambdaDot to ( rgo - St * lambda ) / Qp.           // turn rate
             }
 
@@ -397,7 +409,6 @@ function peg {
 
             // FIXME: add releasing plane control
             // FIXME: add Lambert targetting
-
             set rd to peg_rdval * (rp - vdot(rp, peg_iy) * peg_iy):normalized.
 
             if peg_terminalGuidance {
@@ -407,6 +418,12 @@ function peg {
             local ix is rd:normalized.
             local iz is vcrs(ix, peg_iy).
             local vd to peg_vdval * (sin(peg_gamma)*ix + cos(peg_gamma)*iz).
+
+            if peg_targettype = 2 { // Jaggers1977
+                local n is V(0,0,1).
+                local SE to -0.5*(vdot(n,peg_iy) + cos(peg_inc))*vdot(n,iz)/(1-vdot(n,ix)^2). // converges to zero
+                set peg_iy to peg_iy*sqrt(1 - SE^2) + SE*iz.
+            }
 
             local vmiss is vd - vp.
 
