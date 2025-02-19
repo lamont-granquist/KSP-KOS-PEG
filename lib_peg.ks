@@ -229,7 +229,8 @@ function peg {
         // FIXME: do something about clipping lambdadot for short burns
         // FIXME: inclination and LAN control
         // FIXME: inclination and free LAN control
-        // FIXME: general cleanup from all the hackery
+        // FIXME: support coast-to-burn at fixed burn centroid?
+        // FIXME: use kepler propagator for coasts?
 
         until false {
             /////////////////////////////////////
@@ -262,6 +263,9 @@ function peg {
             //////////////////////////////////////////////////
             // stage times and thrust integrals [TGO+INTEG] //
             //////////////////////////////////////////////////
+
+            // FIXME: support constant accel phases.
+            // FIXME: support X secs of min/lower Throttle to reduce dispersions.
 
             // kind of follows Langston(1976)
 
@@ -390,6 +394,9 @@ function peg {
             //////////////////////////////////////////////////
             // Update rd and vgo for next cycle [CORRECTOR] //
             //////////////////////////////////////////////////
+
+            // FIXME: add releasing plane control
+            // FIXME: add Lambert targetting
 
             set rd to peg_rdval * (rp - vdot(rp, peg_iy) * peg_iy):normalized.
 
