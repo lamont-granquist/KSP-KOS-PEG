@@ -16,7 +16,7 @@ local tgt_per is 100000.
 // PEG target conditions
 set peg_targettype to 2.
 peg_set_peA_apA_attA(tgt_per, 200000, 0).
-peg_set_inc_lan_at_r(90).
+peg_set_inc_lan_at_r(30).
 
 // mass is t, thrust is kN, isp is sec, stages are reverse order from ksp (bottom up if you're looking at MJ)
 // ISP numbers for RO engines should come from only MJ's deltaV analyzer and not the PAW or KER
@@ -51,7 +51,7 @@ function set_switch_to_vertical_rise_trigger {
     lock steering to ship:facing.
 
     when ship:altitude > 120 then { // FIXME: altitude of launchpad fix
-        lock steering to heading(90,90).
+        lock steering to heading(peg_heading(),89.99999).
     }
 
     set_switch_to_pitchover_trigger().
