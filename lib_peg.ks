@@ -55,6 +55,7 @@
 //
 
 run once lib_util.
+run once lib_lambert.
 
 // PEG Ascent target conditions
 global peg_rdval is 0.     // mode 1,2
@@ -425,7 +426,7 @@ function peg {
 
             // rgrav/vgrav calculation from Delporte and Sauvient(1992) [NB: several typos].
 
-            local graviter = 0.
+            local graviter is 0.
 
             set rp to rv + vv*tgo + rthrust + rgrav.
             set vp to vv + vthrust + vgrav.

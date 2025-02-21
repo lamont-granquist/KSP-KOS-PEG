@@ -11,23 +11,41 @@ local tpo is tacc + 10. // time to end of initiation.
 local tc is 3.          // time constant for decay from initiation to gravity turn.
 local dtheta is 2.0.    // angular deflection to initiate at tpo, higher is more aggressive.
 
-local tgt_per is 100000.
+local tgt_per is 145000.
 
 // PEG target conditions
 set peg_targettype to 2.
 peg_set_peA_apA_attA(tgt_per, 200000, 0).
 peg_set_inc_lan_at_r(30).
 
-// This is the kOS MyFirstRocket craft with an additional Adv Inline Stabilizer on the upper stage for more RW control.
+// This is a Titan-II GLV clone.
 //
 // mass is t, thrust is kN, isp is sec, stages are reverse order from ksp (bottom up if you're looking at MJ)
 // ISP numbers for RO engines should come from only MJ's deltaV analyzer and not the PAW or KER
 // (MJ gets nonISP fuel correct).
-local stageone to lexicon("startmass", 13.972, "endmass", 5.972, "thrust", 215, "isp", 320).
-local stagetwo to lexicon("startmass", 3.12, "endmass", 1.120, "thrust", 60, "isp", 345).
+local stageone to lexicon("startmass", 155.488, "endmass", 39.294, "thrust", 2338.58, "isp", 301.82).
+local stagetwo to lexicon("startmass", 31.883, "endmass", 5.774, "thrust", 456.1, "isp", 315).
 global peg_stages to list(stageone, stagetwo).
 
 clearscreen.
+
+print "Waiting for ship to unpack.".
+wait until ship:unpacked.
+
+local startgui is gui(400).
+local button is startgui:addbutton("launch").
+
+set button:onclick to start_launch@.
+
+startgui:show().
+
+local ready is false.
+wait until ready.
+
+function start_launch {
+    startgui:hide().
+    set ready to true.
+}
 
 function enable_autostaging {
     when maxthrust = 0 then {
@@ -36,6 +54,9 @@ function enable_autostaging {
         return true.
     }
 }
+
+// FIXME: stage launch clamps at TWR > 1.0
+// FIXME: hotstaging
 
 function set_start_launch_trigger {
     when peg_converged then {
@@ -79,47 +100,24 @@ function set_switch_to_gravity_turn_trigger {
 
         lock pitch to fpa - dtheta * constant:e^(-(t-tpo)/tc).
 
-        set kuniverse:timewarp:mode to "PHYSICS".
-        set kuniverse:timewarp:rate to 4.
+        //set kuniverse:timewarp:mode to "PHYSICS".
+        //set kuniverse:timewarp:rate to 4.
 
-        set_switch_to_coasting_trigger().
+        set_high_Q_trigger().
     }
 }
 
-function set_switch_to_coasting_trigger {
-    when ship:apoapsis > tgt_per then {
-        print "coasting to insertion".
-
-        lock throttle to 0.
-        lock steering to ship:velocity:surface.
-
-        // for some reason my vessel gets the wobblies at high physwarp on coast initiation.
-        set kuniverse:timewarp:rate to 0.
-
-        local resumewarp to missiontime + 3.
-
-        when missiontime > resumewarp then {
-            set kuniverse:timewarp:rate to 4.
-        }
-
-        when ship:altitude > ship:obt:body:atm:height then {
-            lock steering to frominertial(swizzle(peg_i_F)). // FIXME: peg_i_F should be in rotating alice-world
-        }
-
-        when ship:orbit:eta:apoapsis < 0.5*peg_tgo() + 10 then {
-            set kuniverse:timewarp:rate to 0.
-        }
-
-        set_switch_to_insertion_trigger().
+function set_high_Q_trigger {
+    when ship:dynamicpressure > 0.10 then {
+        set_peg_guidance_trigger().
     }
 }
 
-function set_switch_to_insertion_trigger {
-    when ship:orbit:eta:apoapsis < 0.5*peg_tgo() then {
-        print "PEG insertion burn".
+function set_peg_guidance_trigger {
+    when ship:dynamicpressure < 0.05 then {
+        print "PEG guidance".
 
         lock steering to peg_uf().
-        lock throttle to 1.
 
         // FIXME: need to have better cutoff based on reaching angular momentum target
         when peg_tgo() <= 0.02 then {
