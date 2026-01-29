@@ -33,6 +33,7 @@
 // - Zhang2022: https://doi.org/10.1088/1742-6596/2235/1/012017 (another PEG-ish landing algorithm)
 // - Lee2023: https://ieeexplore.ieee.org/document/10178305 (PEG modified for antiballistic missile interceptors)
 // - Ma2025: https://www.mdpi.com/2226-4310/12/1/61 (gauss quadrature thrust integrals and enhancement for convergence range)
+// - Mahajan2025: https://ntrs.nasa.gov/api/citations/20250008278/downloads/PEG_ASC25_Mahajan.pdf (elliptical orbit insertion and vernier range control)
 //
 // wish someone would e-mail me these:
 //
