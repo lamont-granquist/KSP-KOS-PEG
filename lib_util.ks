@@ -18,17 +18,17 @@ function rotxy {
 function toinertial {
     parameter vec.
 
-    local ang to vang(SOLARPRIMEVECTOR, V(1, 0, 0)).
+    local inertialvec to vec * lookdirup(SOLARPRIMEVECTOR,v(0,1,0).
 
-    return rotxy(vec, ang).
+    return inertialvec.
 }
 
 function frominertial {
     parameter vec.
 
-    local ang to vang(SOLARPRIMEVECTOR, V(1, 0, 0)).
+    local rotatingvec to vec * lookdirup(SOLARPRIMEVECTOR,v(0,1,0):INVERSE.
 
-    return rotxy(vec, -ang).
+    return rotatingvec.
 }
 
 function swizzle {
