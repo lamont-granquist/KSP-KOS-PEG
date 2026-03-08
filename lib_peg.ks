@@ -35,6 +35,11 @@
 // - Ma2025: https://www.mdpi.com/2226-4310/12/1/61 (gauss quadrature thrust integrals and enhancement for convergence range)
 // - Mahajan2025: https://ntrs.nasa.gov/api/citations/20250008278/downloads/PEG_ASC25_Mahajan.pdf (elliptical orbit insertion and vernier range control)
 //
+// KSP implementations:
+//
+// - https://github.com/Noiredd/PEGAS
+// - https://github.com/ChrisInBed/Chris_KSP_Lib/blob/main/Script/pegland.ks
+//
 // wish someone would e-mail me these:
 //
 // - Fill1980: PEG prediction corrections. Shuttle Memo No. 10E-80-11, C.S. Draper Laboratory
